@@ -19,11 +19,7 @@ interface props {
   duration?: number;
 }
 
-export default function Tela({
-  visible,
-  onClose,
-  duration = 200,
-}: props) {
+export default function Tela({ visible, onClose, duration = 200 }: props) {
   const translateX = useRef(new Animated.Value(width)).current;
   const overlayOpacity = useRef(new Animated.Value(0)).current;
   const [isMounted, setIsMounted] = useState(visible);
@@ -38,7 +34,7 @@ export default function Tela({
     };
     const subscription = BackHandler.addEventListener(
       "hardwareBackPress",
-      onBackPress
+      onBackPress,
     );
     return () => subscription.remove();
   }, [visible, onClose]);
@@ -103,14 +99,13 @@ export default function Tela({
             <TouchableOpacity onPress={onClose}>
               <Ionicons name="arrow-back-outline" size={26} color="#111" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Preferêcias de navegação</Text>
+            <Text style={styles.headerTitle}>Preferêcias de navegação.</Text>
             <View style={{ width: 26 }} />
           </View>
         </View>
 
         {/* BODY */}
-        <View style={styles.body}>         
-        </View>       
+        <View style={styles.body}></View>
       </Animated.View>
     </View>
   );
@@ -147,5 +142,4 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  
 });
