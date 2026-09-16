@@ -11,7 +11,7 @@ import {
 
 // Teto para o quanto o texto cresce com a preferência de fonte do sistema.
 // Em 1 o app ignoraria a acessibilidade; sem teto, um aparelho com fonte
-// grande estoura o layout. Ver docs/docs-claude/fontes-android-ios.md.
+// grande estoura o layout.
 export const ESCALA_MAXIMA_FONTE = 1.2;
 
 // A Roboto (Android) tem altura-de-x maior que a SF Pro (iOS), então o mesmo
