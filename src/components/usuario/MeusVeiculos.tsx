@@ -1,7 +1,7 @@
 // CODEX: 0 linhas alteradas; adapta cadastro de veículos a teclado, largura e rotação. Remover após validação ou commit.
 import { api } from "@/Services/api";
 import { Text, TextInput } from "@/components/common/Texto";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -33,7 +33,12 @@ interface Veiculo {
   cor: string;
   placa: string;
   renavam: string;
-  categoria: "carro" | "moto" | "bicicleta";
+  categoria: "carro" | "moto";
+  // aprovados pela gestão; os "_solicitado" são o pedido em análise
+  eletrico?: boolean;
+  taxi?: boolean;
+  eletrico_solicitado?: boolean;
+  taxi_solicitado?: boolean;
   status: string;
   uf: string;
 }
@@ -47,6 +52,8 @@ interface FormularioVeiculo {
   placa: string;
   renavam: string;
   categoria: Veiculo["categoria"];
+  eletrico: boolean;
+  taxi: boolean;
   uf: string;
 }
 
@@ -60,14 +67,30 @@ const FORMULARIO_INICIAL: FormularioVeiculo = {
   placa: "",
   renavam: "",
   categoria: "carro",
+  eletrico: false,
+  taxi: false,
   uf: "RO",
 };
 
 const rotuloCategoria: Record<Veiculo["categoria"], string> = {
   carro: "Carro",
   moto: "Moto",
-  bicicleta: "Bicicleta",
 };
+
+// categorias de corrida que o veículo recebe: Elétrico (só carro) e Táxi
+// valem depois que a gestão aprova o pedido
+const rotuloDoVeiculo = (veiculo: Veiculo) =>
+  [
+    rotuloCategoria[veiculo.categoria] ?? veiculo.categoria,
+    veiculo.eletrico
+      ? "Elétrico"
+      : veiculo.eletrico_solicitado
+        ? "Elétrico em análise"
+        : null,
+    veiculo.taxi ? "Táxi" : veiculo.taxi_solicitado ? "Táxi em análise" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
 const mensagemDoErro = (erro: unknown) => {
   if (!erro || typeof erro !== "object" || !("response" in erro)) {
@@ -107,6 +130,8 @@ const gerarDadosDeDesenvolvimento = (): FormularioVeiculo => {
     placa: `DEV${digito}${letra}${finalPlaca}`,
     renavam: String(instante).slice(-11).padStart(11, "0"),
     categoria: "carro",
+    eletrico: false,
+    taxi: false,
     uf: "RO",
   };
 };
@@ -230,8 +255,16 @@ export default function MeusVeiculos({
 
   if (!isMounted) return null;
 
-  const atualizar = (campo: keyof FormularioVeiculo, valor: string) => {
-    setFormulario((atual) => ({ ...atual, [campo]: valor }));
+  const atualizar = <Campo extends keyof FormularioVeiculo>(
+    campo: Campo,
+    valor: FormularioVeiculo[Campo],
+  ) => {
+    setFormulario((atual) => ({
+      ...atual,
+      [campo]: valor,
+      // não existe moto elétrica
+      ...(campo === "categoria" && valor === "moto" ? { eletrico: false } : {}),
+    }));
   };
 
   return (
@@ -374,21 +407,15 @@ function CartaoVeiculo({
     <View style={styles.card}>
       <View style={styles.cardTopo}>
         <View style={styles.badge}>
-          <Text style={styles.badgeTexto}>
-            {rotuloCategoria[veiculo.categoria]}
-          </Text>
+          <Text style={styles.badgeTexto}>{rotuloDoVeiculo(veiculo)}</Text>
         </View>
         <Text style={styles.status}>{veiculo.status}</Text>
       </View>
       <View style={styles.cardLinha}>
         <View style={styles.iconeVeiculo}>
-          <Ionicons
-            name={
-              veiculo.categoria === "moto"
-                ? "bicycle-outline"
-                : "car-sport-outline"
-            }
-            size={30}
+          <MaterialCommunityIcons
+            name={veiculo.categoria === "moto" ? "motorbike" : "car-side"}
+            size={32}
             color="#222"
           />
         </View>
@@ -414,6 +441,37 @@ function CartaoVeiculo({
   );
 }
 
+function Marcacao({
+  titulo,
+  apoio,
+  marcado,
+  onAlternar,
+}: {
+  titulo: string;
+  apoio: string;
+  marcado: boolean;
+  onAlternar: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={styles.marcacao}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: marcado }}
+      onPress={onAlternar}
+    >
+      <Ionicons
+        name={marcado ? "checkbox" : "square-outline"}
+        size={24}
+        color={marcado ? "#111" : "#9CA3AF"}
+      />
+      <View style={styles.marcacaoTextos}>
+        <Text style={styles.marcacaoTitulo}>{titulo}</Text>
+        <Text style={styles.marcacaoApoio}>{apoio}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 function Formulario({
   dados,
   erro,
@@ -426,7 +484,10 @@ function Formulario({
   erro: string | null;
   salvando: boolean;
   insetsBottom: number;
-  onAtualizar: (campo: keyof FormularioVeiculo, valor: string) => void;
+  onAtualizar: <Campo extends keyof FormularioVeiculo>(
+    campo: Campo,
+    valor: FormularioVeiculo[Campo],
+  ) => void;
   onSalvar: () => void;
 }) {
   return (
@@ -444,7 +505,7 @@ function Formulario({
       >
         <Text style={styles.secaoTitulo}>Tipo de veículo</Text>
         <View style={styles.categorias}>
-          {(["carro", "moto", "bicicleta"] as const).map((categoria) => (
+          {(["carro", "moto"] as const).map((categoria) => (
             <TouchableOpacity
               key={categoria}
               style={[
@@ -464,6 +525,24 @@ function Formulario({
             </TouchableOpacity>
           ))}
         </View>
+        {dados.categoria === "carro" ? (
+          <Marcacao
+            titulo="Pedir a categoria Elétrico"
+            apoio="A gestão confere o carro antes de liberar as corridas Elétrico."
+            marcado={dados.eletrico}
+            onAlternar={() => onAtualizar("eletrico", !dados.eletrico)}
+          />
+        ) : null}
+        <Marcacao
+          titulo="Pedir a categoria Táxi"
+          apoio={
+            dados.categoria === "moto"
+              ? "Para moto táxi licenciado. A gestão confere a licença antes de liberar as corridas Táxi."
+              : "Para táxi licenciado. A gestão confere a licença antes de liberar as corridas Táxi."
+          }
+          marcado={dados.taxi}
+          onAlternar={() => onAtualizar("taxi", !dados.taxi)}
+        />
         <Campo
           rotulo="Marca"
           valor={dados.marca}
@@ -763,6 +842,15 @@ const styles = StyleSheet.create({
   categoriaAtiva: { backgroundColor: "#FFF4B2", borderColor: "#D9B500" },
   categoriaTexto: { color: "#666", fontWeight: "600" },
   categoriaTextoAtivo: { color: "#111", fontWeight: "800" },
+  marcacao: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minHeight: 48,
+  },
+  marcacaoTextos: { flex: 1 },
+  marcacaoTitulo: { fontSize: 15, fontWeight: "700", color: "#222" },
+  marcacaoApoio: { fontSize: 12, color: "#666", marginTop: 2 },
   camposLinha: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   campo: { gap: 6 },
   campoMetade: { flexGrow: 1, flexBasis: 140, minWidth: 0 },
