@@ -474,10 +474,6 @@ export function useDespachoMotorista(pausado = false) {
         } catch {
           // posição é informativa; falhar aqui não pode atrapalhar a corrida
         }
-
-        // durante corrida, posição nova também produz uma previsão nova
-        if (!cancelado && corridaAtivaId !== undefined)
-          await carregarCorridaAtual();
       } catch {
         // GPS indisponível nesta rodada; o próximo intervalo tenta de novo.
       } finally {
@@ -485,9 +481,26 @@ export function useDespachoMotorista(pausado = false) {
       }
     };
 
+    // a corrida (previsão e pedido de novo destino) tem relógio próprio: o
+    // GPS pode levar dezenas de segundos por leitura, e o pedido do passageiro
+    // expira em 2 min
+    let recarregando = false;
+    const recarregarCorrida = async () => {
+      if (recarregando || cancelado || corridaAtivaId === undefined) return;
+      recarregando = true;
+      try {
+        await carregarCorridaAtual();
+      } finally {
+        recarregando = false;
+      }
+    };
+
     enviarPosicao();
 
-    const relogio = setInterval(enviarPosicao, INTERVALO_POSICAO_MS);
+    const relogio = setInterval(() => {
+      void enviarPosicao();
+      void recarregarCorrida();
+    }, INTERVALO_POSICAO_MS);
 
     return () => {
       cancelado = true;
