@@ -1,9 +1,16 @@
 import { api } from "@/Services/api";
 import { hostDeDesenvolvimento } from "@/Services/hostDev";
 import Echo from "laravel-echo";
-import Pusher from "pusher-js";
+import PusherImportado from "pusher-js";
 import type { Channel } from "pusher-js";
 import type { ChannelAuthorizationCallback } from "pusher-js/types/src/core/auth/options";
+
+// O build React Native do pusher-js 8.6 exporta `{ Pusher }`, e não o default
+// que os tipos declaram. Sem desembrulhar, o Echo recebia um objeto, lançava
+// "Object cannot be used as a constructor" e o tempo real nunca conectava.
+const Pusher =
+  (PusherImportado as unknown as { Pusher?: typeof PusherImportado }).Pusher ??
+  PusherImportado;
 
 // O laravel-echo procura o Pusher no escopo global.
 (globalThis as unknown as { Pusher: typeof Pusher }).Pusher = Pusher;
