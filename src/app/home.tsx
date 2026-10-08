@@ -363,6 +363,8 @@ export default function Home() {
           destino={ofertaExibida.destino}
           paradas={ofertaExibida.paradas}
           paraOutraPessoa={ofertaExibida.para_outra_pessoa}
+          categoria={ofertaExibida.categoria}
+          metodoPagamento={ofertaExibida.metodo_pagamento}
           notaPassageiro={ofertaExibida.passageiro_nota}
           corridasPassageiro={ofertaExibida.passageiro_corridas}
           onAceitar={

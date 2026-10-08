@@ -22,6 +22,9 @@ export interface OfertaCorrida {
   destino: string | null;
   paradas: number;
   para_outra_pessoa?: boolean;
+  // nome da categoria que este motorista atende no pedido (Pop, Moto...)
+  categoria?: string | null;
+  metodo_pagamento?: string | null;
   passageiro_nota: number | null;
   passageiro_corridas: number;
   recusada_localmente?: boolean;

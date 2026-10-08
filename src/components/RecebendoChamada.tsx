@@ -21,9 +21,24 @@ interface RecebendoChamadaProps {
   destino?: string | null;
   paradas?: number;
   paraOutraPessoa?: boolean;
+  categoria?: string | null;
+  metodoPagamento?: string | null;
   notaPassageiro?: number | null;
   corridasPassageiro?: number;
 }
+
+const ICONE_PAGAMENTO: Record<
+  string,
+  {
+    nome: React.ComponentProps<typeof Ionicons>["name"];
+    cor: string;
+    rotulo: string;
+  }
+> = {
+  dinheiro: { nome: "cash-outline", cor: "#21C987", rotulo: "Dinheiro" },
+  pix: { nome: "qr-code-outline", cor: "#32BCAD", rotulo: "Pix" },
+  cartao: { nome: "card-outline", cor: "#3488E8", rotulo: "Cartão" },
+};
 
 const DURACAO_OFERTA_MS = 20_000;
 
@@ -152,9 +167,13 @@ export default function RecebendoChamadas({
   destino,
   paradas = 0,
   paraOutraPessoa = false,
+  categoria,
+  metodoPagamento,
   notaPassageiro,
   corridasPassageiro = 0,
 }: RecebendoChamadaProps) {
+  const pagamento =
+    ICONE_PAGAMENTO[metodoPagamento ?? "dinheiro"] ?? ICONE_PAGAMENTO.dinheiro;
   const playerRef = useRef<AudioPlayer | null>(null);
   const onRecusarRef = useRef(onRecusar);
 
@@ -289,13 +308,22 @@ export default function RecebendoChamadas({
           />
         </View>
 
+        {categoria ? (
+          <View style={styles.categoriaChip}>
+            <Text style={styles.categoriaTexto}>{categoria}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.valorContainer}>
           <Text style={styles.valorText}>{emReais(valor)}</Text>
         </View>
 
         <View style={styles.infoPagamento}>
-          <View style={styles.iconPagamento}>
-            <Ionicons name="cash-outline" size={18} color="#fff" />
+          <View
+            style={[styles.iconPagamento, { backgroundColor: pagamento.cor }]}
+            accessibilityLabel={`Pagamento: ${pagamento.rotulo}`}
+          >
+            <Ionicons name={pagamento.nome} size={18} color="#fff" />
           </View>
           <Text className="ml-2 mt-1" style={styles.topText}>
             {`${distanciaViagem} · ${emKm(distanciaAteOrigem)} até a partida`}
@@ -453,6 +481,16 @@ const styles = StyleSheet.create({
     // Garante que o texto esteja acima do pulso
     zIndex: 2,
   },
+  categoriaChip: {
+    alignSelf: "center",
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginBottom: 2,
+    zIndex: 2,
+  },
+  categoriaTexto: { color: "#fff", fontSize: 14, fontWeight: "700" },
   valorContainer: {
     alignItems: "center",
     justifyContent: "center",
