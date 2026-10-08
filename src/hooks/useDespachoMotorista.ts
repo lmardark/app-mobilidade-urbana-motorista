@@ -25,9 +25,18 @@ export interface OfertaCorrida {
   // nome da categoria que este motorista atende no pedido (Pop, Moto...)
   categoria?: string | null;
   metodo_pagamento?: string | null;
+  // Negocia: o motorista manda proposta e o passageiro escolhe
+  negociavel?: boolean;
+  minha_proposta?: PropostaEnviada | null;
   passageiro_nota: number | null;
   passageiro_corridas: number;
   recusada_localmente?: boolean;
+}
+
+export interface PropostaEnviada {
+  valor_motorista: number | null;
+  status: string;
+  expira_em: string | null;
 }
 
 export interface CorridaEmCurso {
@@ -44,6 +53,7 @@ export interface CorridaEmCurso {
   }[];
   corrida_financeiro?: {
     metodo_pagamento: string | null;
+    valor_motorista?: number | string | null;
   } | null;
   produto?: { id: number; nome: string } | null;
   metodo_pagamento?: string | null;
@@ -127,6 +137,7 @@ export function useDespachoMotorista(pausado = false) {
   const [appAtivo, setAppAtivo] = useState(AppState.currentState === "active");
 
   const recusadas = useRef<Set<number>>(new Set());
+  const propostasMandadas = useRef<Set<number>>(new Set());
   const corridaRef = useRef<CorridaEmCurso | null>(null);
 
   const aplicarCorrida = useCallback(
@@ -145,6 +156,23 @@ export function useDespachoMotorista(pausado = false) {
       }
 
       if (nova !== null) setDisponivel(false);
+
+      // Negocia: a corrida chega quando o passageiro escolhe a proposta (no
+      // Pix/cartão, depois do pagamento), sem o motorista tocar em aceitar
+      if (
+        nova !== null &&
+        nova.status_corrida === "aceita" &&
+        (propostasMandadas.current.has(nova.id) ||
+          anterior?.status_corrida === "aguardando_pagamento")
+      ) {
+        propostasMandadas.current.delete(nova.id);
+        mostrarToast({
+          tipo: "success",
+          titulo: "O passageiro escolheu sua proposta",
+          mensagem: "Siga a rota até o ponto de embarque do passageiro.",
+          chave: `corrida:${nova.id}:aceita`,
+        });
+      }
 
       // o passageiro pode trocar a forma de pagamento uma vez por corrida
       if (
@@ -382,14 +410,41 @@ export function useDespachoMotorista(pausado = false) {
           ...item,
           recusada_localmente: recusadas.current.has(item.corrida_id),
         }));
-        const proxima = atuais.find((item) => !item.recusada_localmente);
+        // com proposta enviada a chamada não volta a tocar: o motorista só
+        // espera a escolha do passageiro
+        const proxima = atuais.find(
+          (item) =>
+            !item.recusada_localmente &&
+            item.minha_proposta?.status !== "pendente",
+        );
 
         setOfertas(atuais);
         setOferta(proxima ?? null);
-      } catch {
+
+        // Negocia: a corrida em que ele propôs saiu da lista porque o
+        // passageiro escolheu alguém; se foi ele, ela vira a corrida atual
+        const decididas = [...propostasMandadas.current].filter(
+          (id) => !atuais.some((item) => item.corrida_id === id),
+        );
+        if (decididas.length > 0) {
+          await carregarCorridaAtual();
+          decididas.forEach((id) => propostasMandadas.current.delete(id));
+        }
+      } catch (falha) {
         if (!cancelado) {
           setOferta(null);
           setOfertas([]);
+        }
+
+        // 409: o servidor já não o vê disponível (no Negocia, foi escolhido
+        // pelo passageiro e a corrida é dele); a tela acompanha o servidor
+        // (mesma ordem da abertura do app: situação e depois a corrida inteira)
+        if (
+          (falha as { response?: { status?: number } })?.response?.status ===
+          409
+        ) {
+          await sincronizarSituacao();
+          await carregarCorridaAtual();
         }
       } finally {
         emBusca = false;
@@ -411,7 +466,16 @@ export function useDespachoMotorista(pausado = false) {
       clearTimeout(buscaInicial);
       clearInterval(relogio);
     };
-  }, [pausado, appAtivo, disponivel, corrida, socketAtivo, gatilho]);
+  }, [
+    pausado,
+    appAtivo,
+    disponivel,
+    corrida,
+    socketAtivo,
+    gatilho,
+    carregarCorridaAtual,
+    sincronizarSituacao,
+  ]);
 
   // WebSocket em cima do polling: avisa que a lista mudou e o hook refaz a
   // consulta (o raio e a autorização seguem no servidor). Sem socket, o
@@ -609,6 +673,48 @@ export function useDespachoMotorista(pausado = false) {
     },
     [oferta, ofertas, mostrarToast],
   );
+
+  const propor = useCallback(
+    async (corridaId: number, valorMotorista?: number) => {
+      setOcupado(true);
+
+      try {
+        const { data } = await api.post<PropostaEnviada>(
+          `/motorista/corridas/${corridaId}/propostas`,
+          valorMotorista === undefined
+            ? {}
+            : { valor_motorista: valorMotorista },
+        );
+
+        propostasMandadas.current.add(corridaId);
+        const atualizadas = ofertas.map((item) =>
+          item.corrida_id === corridaId
+            ? { ...item, minha_proposta: data }
+            : item,
+        );
+        setOfertas(atualizadas);
+        setOferta(
+          atualizadas.find(
+            (item) =>
+              !item.recusada_localmente &&
+              item.minha_proposta?.status !== "pendente",
+          ) ?? null,
+        );
+      } catch {
+        // a corrida pode ter saído da negociação; a lista do servidor manda
+        recusadas.current.add(corridaId);
+        setOferta(null);
+        setGatilho((atual) => atual + 1);
+      } finally {
+        setOcupado(false);
+      }
+    },
+    [ofertas],
+  );
+
+  // proposta do motorista esperando o passageiro escolher (banner na tela)
+  const propostaEnviada =
+    ofertas.find((item) => item.minha_proposta?.status === "pendente") ?? null;
 
   const recarregarOfertas = useCallback(
     () => setGatilho((atual) => atual + 1),
@@ -894,6 +1000,8 @@ export function useDespachoMotorista(pausado = false) {
     alternarDisponibilidade,
     aceitar,
     recusar,
+    propor,
+    propostaEnviada,
     recarregarOfertas,
     avancar,
     cancelarCorrida,

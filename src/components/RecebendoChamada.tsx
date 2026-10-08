@@ -14,6 +14,9 @@ import NegociarChamada from "./NegociarChamada";
 interface RecebendoChamadaProps {
   onAceitar: () => void;
   onRecusar: () => void;
+  // Negocia: aceitar é mandar proposta pela oferta (sem valor) ou por outro valor
+  negociavel?: boolean;
+  onPropor?: (valorMotorista?: number) => void;
   valor?: number;
   distanciaAteOrigem?: number;
   distanciaDaCorrida?: number;
@@ -160,6 +163,8 @@ const pulseStyles = StyleSheet.create({
 export default function RecebendoChamadas({
   onAceitar,
   onRecusar,
+  negociavel = false,
+  onPropor,
   valor = 8.2,
   distanciaAteOrigem,
   distanciaDaCorrida,
@@ -263,13 +268,14 @@ export default function RecebendoChamadas({
     pararSom();
   };
 
-  const acceptAndUnload = () => {
+  const acceptAndUnload = (valorProposto?: number) => {
     // chamado ao aceitar
     if (!closedRef.current) closedRef.current = true;
     setIsPulsing(false); // Pára o pulso
 
     try {
-      onAceitar();
+      if (negociavel && onPropor) onPropor(valorProposto);
+      else onAceitar();
     } catch {
       // swallow
     }
@@ -415,14 +421,19 @@ export default function RecebendoChamadas({
           </Text>
         </TouchableOpacity>
 
-        {/* aqui deve ficar o componente NegociarChamada */}
-        <NegociarChamada
-          valorBase={valor}
-          onValorEscolhido={(novoValor) => {
-            console.log("Valor negociado escolhido:", novoValor);
-            // Aqui você pode atualizar o estado ou chamar outra ação
-          }}
-        />
+        {/* só no Negocia o motorista pode pedir mais: o passageiro escolhe
+            entre as propostas */}
+        {negociavel ? (
+          <>
+            <Text style={styles.avisoNegocia}>
+              O passageiro escolhe entre as propostas recebidas.
+            </Text>
+            <NegociarChamada
+              valorBase={valor}
+              onValorEscolhido={(novoValor) => acceptAndUnload(novoValor)}
+            />
+          </>
+        ) : null}
 
         <TouchableOpacity
           style={styles.recusarBtn}
@@ -491,6 +502,12 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   categoriaTexto: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  avisoNegocia: {
+    color: "#bbb",
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: 10,
+  },
   valorContainer: {
     alignItems: "center",
     justifyContent: "center",
