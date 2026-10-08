@@ -1,4 +1,5 @@
 import { api } from "@/Services/api";
+import { hostDeDesenvolvimento } from "@/Services/hostDev";
 import Echo from "laravel-echo";
 import Pusher from "pusher-js";
 import type { Channel } from "pusher-js";
@@ -8,7 +9,7 @@ import type { ChannelAuthorizationCallback } from "pusher-js/types/src/core/auth
 (globalThis as unknown as { Pusher: typeof Pusher }).Pusher = Pusher;
 
 const chave = process.env.EXPO_PUBLIC_REVERB_APP_KEY;
-const host = process.env.EXPO_PUBLIC_REVERB_HOST;
+const host = hostDeDesenvolvimento(process.env.EXPO_PUBLIC_REVERB_HOST);
 const porta = Number(process.env.EXPO_PUBLIC_REVERB_PORT ?? 8080);
 const esquema = process.env.EXPO_PUBLIC_REVERB_SCHEME ?? "http";
 

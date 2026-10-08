@@ -1,7 +1,8 @@
 import axios, { create } from "axios";
 import * as SecureStore from "expo-secure-store";
+import { urlDeDesenvolvimento } from "@/Services/hostDev";
 
-const baseURL = process.env.EXPO_PUBLIC_API_URL?.trim();
+const baseURL = urlDeDesenvolvimento(process.env.EXPO_PUBLIC_API_URL?.trim());
 
 if (!baseURL) {
   throw new Error("EXPO_PUBLIC_API_URL não foi configurada.");
