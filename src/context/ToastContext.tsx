@@ -33,6 +33,14 @@ interface ToastContextValue {
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
+
+// só estes avisos aparecem: corrida aceita e a resposta do motorista ao novo
+// destino/trajeto pedido pelo passageiro
+const TOASTS_PERMITIDOS = [
+  /^corrida:\d+:aceita$/,
+  /^destino:\d+:(aceito|recusado)$/,
+];
+
 const DURACAO_ENTRADA_MS = 220;
 const DURACAO_SAIDA_MS = 200;
 
@@ -139,7 +147,8 @@ export function ToastProvider({ children }: PropsWithChildren) {
   }, []);
 
   const mostrarToast = useCallback((opcoes: OpcoesToast) => {
-    if (!opcoes.chave?.endsWith(":aceita")) return;
+    if (!TOASTS_PERMITIDOS.some((padrao) => padrao.test(opcoes.chave ?? "")))
+      return;
 
     const tipo = opcoes.tipo ?? "info";
     const chave =

@@ -732,13 +732,14 @@ export function useDespachoMotorista(pausado = false) {
           `/motorista/corridas/${corrida.id}/destino/${pedidoNovoDestino.id}/${aceitar ? "aceitar" : "recusar"}`,
         );
         setPedidoNovoDestino(null);
+        const alvo = pedidoNovoDestino.paradas?.length ? "trajeto" : "destino";
         mostrarToast({
           tipo: aceitar ? "success" : "info",
-          titulo: aceitar ? "Novo destino aceito" : "Novo destino recusado",
+          titulo: aceitar ? `Novo ${alvo} aceito` : `Novo ${alvo} recusado`,
           mensagem: aceitar
-            ? "A rota foi atualizada para o novo destino."
-            : "A corrida segue para o destino anterior.",
-          chave: `destino:${pedidoNovoDestino.id}:${aceitar}`,
+            ? `A rota foi atualizada para o novo ${alvo}.`
+            : `A corrida segue no ${alvo} anterior.`,
+          chave: `destino:${pedidoNovoDestino.id}:${aceitar ? "aceito" : "recusado"}`,
         });
       } catch (falha) {
         mostrarToast({
