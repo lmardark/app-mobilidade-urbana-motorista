@@ -34,8 +34,9 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-// só estes avisos aparecem: corrida aceita e a resposta do motorista ao novo
-// destino/trajeto pedido pelo passageiro
+// de sucesso e informação, só estes aparecem: corrida aceita e a resposta do
+// motorista ao novo destino/trajeto pedido pelo passageiro. Erros e avisos
+// sempre aparecem, com o motivo: sem eles a falha ficava muda.
 const TOASTS_PERMITIDOS = [
   /^corrida:\d+:aceita$/,
   /^destino:\d+:(aceito|recusado)$/,
@@ -147,10 +148,15 @@ export function ToastProvider({ children }: PropsWithChildren) {
   }, []);
 
   const mostrarToast = useCallback((opcoes: OpcoesToast) => {
-    if (!TOASTS_PERMITIDOS.some((padrao) => padrao.test(opcoes.chave ?? "")))
+    const tipo = opcoes.tipo ?? "info";
+    const problema = tipo === "error" || tipo === "warning";
+
+    if (
+      !problema &&
+      !TOASTS_PERMITIDOS.some((padrao) => padrao.test(opcoes.chave ?? ""))
+    )
       return;
 
-    const tipo = opcoes.tipo ?? "info";
     const chave =
       opcoes.chave ?? [tipo, opcoes.titulo, opcoes.mensagem ?? ""].join(":");
     const agora = Date.now();
@@ -172,9 +178,11 @@ export function ToastProvider({ children }: PropsWithChildren) {
       id: proximoId.current++,
       chave,
       titulo: opcoes.titulo,
-      mensagem: undefined,
+      mensagem: problema ? opcoes.mensagem : undefined,
       tipo,
-      duracaoMs: Math.min(4000, Math.max(1800, opcoes.duracaoMs ?? 2800)),
+      duracaoMs: problema
+        ? Math.min(6000, Math.max(3500, opcoes.duracaoMs ?? 4500))
+        : Math.min(4000, Math.max(1800, opcoes.duracaoMs ?? 2800)),
     };
 
     setToasts([novoToast]);
