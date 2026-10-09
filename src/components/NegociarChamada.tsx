@@ -88,7 +88,7 @@ const NegociarChamada = ({
                   isSelected ? styles.textoSelecionado : null,
                 ]}
               >
-                R${valor.toFixed(2).replace(".", ",")}
+                R$ {valor.toFixed(2).replace(".", ",")}
               </Text>
             </TouchableOpacity>
           );
