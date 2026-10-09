@@ -3,6 +3,7 @@ import { api } from "@/Services/api";
 import { obterEcho } from "@/Services/echo";
 import { useToast } from "@/context/ToastContext";
 import { ResumoEspera } from "@/domain/contadorEspera";
+import { comTempoLimite } from "@/domain/localizacao";
 import { proximoPontoDaCorrida } from "@/domain/rotaDaCorrida";
 import * as Location from "expo-location";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -208,7 +209,20 @@ export function useDespachoMotorista(pausado = false) {
 
     if (permissao.status !== "granted") return null;
 
-    const { coords } = await Location.getCurrentPositionAsync({});
+    // o mapa já acompanha o GPS: a leitura recente chega na hora. Pedir uma
+    // nova a cada rodada levava ~30 s em aparelho parado.
+    const recente = await Location.getLastKnownPositionAsync({
+      maxAge: 15_000,
+      requiredAccuracy: 100,
+    });
+    const { coords } =
+      recente ??
+      (await comTempoLimite(
+        Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        }),
+        20_000,
+      ));
 
     return { latitude: coords.latitude, longitude: coords.longitude };
   }, []);
@@ -700,7 +714,15 @@ export function useDespachoMotorista(pausado = false) {
               item.minha_proposta?.status !== "pendente",
           ) ?? null,
         );
-      } catch {
+      } catch (falha) {
+        mostrarToast({
+          tipo: "warning",
+          titulo: "A proposta não foi enviada",
+          mensagem: mensagemDoErro(
+            falha,
+            "A corrida pode não estar mais recebendo propostas.",
+          ),
+        });
         // a corrida pode ter saído da negociação; a lista do servidor manda
         recusadas.current.add(corridaId);
         setOferta(null);
@@ -709,7 +731,7 @@ export function useDespachoMotorista(pausado = false) {
         setOcupado(false);
       }
     },
-    [ofertas],
+    [ofertas, mostrarToast],
   );
 
   // proposta do motorista esperando o passageiro escolher (banner na tela)
